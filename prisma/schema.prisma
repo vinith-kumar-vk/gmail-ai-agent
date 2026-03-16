@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Thread {
+  id            String    @id @default(uuid())
+  gmailThreadId String    @unique
+  subject       String?
+  lastUpdate    DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+  messages      Message[]
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  gmailMessageId String   @unique
+  rawMessageId   String?
+  threadId       String
+  from           String
+  to             String
+  content        String
+  role           String
+  contextType    String
+  timestamp      DateTime @default(now())
+  sentiment      String?
+  thread         Thread   @relation(fields: [threadId], references: [id])
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  description String
+  status      String
+  priority    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model KnowledgeBase {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+}
+
+model GmailToken {
+  id             String   @id @default("default")
+  clientId       String
+  clientSecret   String
+  refreshToken   String
+  connectedEmail String?
+  connectedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Setting {
+  id               String   @id @default("default")
+  autoReplyEnabled Boolean  @default(false)
+  targetEmail      String   @default("vinithkumar78876@gmail.com")
+  appPassword      String?
+  updatedAt        DateTime @updatedAt
+}

@@ -1,0 +1,3 @@
+{
+  "message": "\nInvalid `prisma.thread.findUnique()` invocation in\nC:\\Users\\Vinith kumar Vijayan\\.gemini\\antigravity\\scratch\\gmail-ai-agent\\scripts\\test-agent-script.js:30:41\n\n  27 console.log(`   From: ${from} | Subject: ${subject}`);\n  28 \n  29 console.log(`3. Checking DB Thread for ${detail.data.threadId}`);\n→ 30 let t = await prisma.thread.findUnique(\nerror: Environment variable not found: DATABASE_URL.\n  -->  schema.prisma:7\n   | \n 6 |   provider = \"sqlite\"\n 7 |   url      = env(\"DATABASE_URL\")\n   | \n\nValidation Error Count: 1"
+}
