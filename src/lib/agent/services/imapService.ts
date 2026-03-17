@@ -169,21 +169,23 @@ export class IMAPService {
       if (message && message.bodyStructure) {
         const findBestPart = (part: any, path: string = ''): { path: string, isHtml: boolean } | null => {
           const currentPath = path || '1';
-          // Prefer plain text
-          if (part.type === 'text/plain') return { path: currentPath, isHtml: false };
+          // FIXED: Prefer HTML over plain text.
+          // Marketing emails send plain text with [link](url) markdown already embedded.
+          // HTML version is more reliable to convert to clean readable text.
+          if (part.type === 'text/html') return { path: currentPath, isHtml: true };
           
           if (part.childNodes) {
-            let htmlPart: { path: string, isHtml: boolean } | null = null;
+            let plainPart: { path: string, isHtml: boolean } | null = null;
             for (let i = 0; i < part.childNodes.length; i++) {
               const childPath = path ? `${path}.${i + 1}` : `${i + 1}`;
               const res = findBestPart(part.childNodes[i], childPath);
-              if (res && !res.isHtml) return res; // Found plain text deep, return immediately
-              if (res && res.isHtml) htmlPart = res;
+              if (res && res.isHtml) return res; // Found HTML, return immediately
+              if (res && !res.isHtml) plainPart = res;
             }
-            return htmlPart; // Only return HTML if no plain text found anywhere
+            return plainPart; // Only return plain text if no HTML found
           }
           
-          if (part.type === 'text/html') return { path: currentPath, isHtml: true };
+          if (part.type === 'text/plain') return { path: currentPath, isHtml: false };
           return null;
         };
 
@@ -226,8 +228,23 @@ export class IMAPService {
         return htmlToPlainText(processed);
       }
 
-      // For plain text, just clean up whitespace
-      return processed.replace(/\s+/g, ' ').trim() || '(Empty content)';
+      // For plain-text emails: aggressively clean up URL/markdown artifacts
+      // Some senders embed [text](url) format even in plain text versions
+      return processed
+        // Remove markdown-style links [text](url) → just keep text
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        // Remove bare URLs (http/https links)
+        .replace(/https?:\/\/[^\s>)"\]]+/g, '')
+        // Remove email-style pipe table separators
+        .replace(/\|/g, ' ')
+        // Remove long dash separators (----)
+        .replace(/-{3,}/g, '')
+        // Remove image markdown ![...](url)
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        // Collapse multiple spaces and clean up
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim() || '(Empty content)';
     } catch (err: any) {
       await client.logout().catch(() => {});
       logger(`[BODY ERROR] ${err.message}`);
