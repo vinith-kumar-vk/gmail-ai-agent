@@ -58,6 +58,33 @@ export default function Dashboard() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null); // for confirm modal
 
+  const stripMarkdown = (md: string) => {
+    if (!md) return '';
+    return md
+      // Strip links [text](url) -> text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Strip images ![text](url) -> text
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      // Strip bold/italics
+      .replace(/(\*\*|__|\*|_)(.*?)\1/g, '$2')
+      // Strip headers
+      .replace(/^#+\s+/gm, '')
+      // Strip strikethrough
+      .replace(/~~(.*?)~~/g, '$1')
+      // Strip inline code
+      .replace(/`([^`]+)`/g, '$1')
+      // Strip blockquotes
+      .replace(/^\s*>+\s?/gm, '')
+      // Strip horizontal rules
+      .replace(/^---+$/gm, '')
+      // Strip links like <http...>
+      .replace(/<([^>]+)>/g, '$1')
+      // Clean up multiple spaces/newlines
+      .replace(/\\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
@@ -512,7 +539,7 @@ export default function Dashboard() {
                           <div className={`w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0 ${lastM?.role === 'ai' ? 'bg-[#1a73e8]' : 'bg-[#1e8e3e]'}`} />
                           <div className="overflow-hidden">
                             <h4 className="text-[14px] font-bold text-[#202124] truncate group-hover:text-[#1a73e8] transition-colors">{t.subject || '(No Subject)'}</h4>
-                            <p className="text-[12px] text-[#5f6368] truncate opacity-60 font-light mt-0.5">{lastM?.content}</p>
+                            <p className="text-[12px] text-[#5f6368] truncate opacity-60 font-light mt-0.5">{stripMarkdown(lastM?.content)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-8 ml-4">
@@ -720,6 +747,7 @@ export default function Dashboard() {
                       onReply={handleManualReply}
                       onMic={startSpeechToText}
                       isRecordingGlobal={isRecordingGlobal}
+                      stripMarkdown={stripMarkdown}
                     />
                   ))}
                 </div>
@@ -738,7 +766,7 @@ export default function Dashboard() {
   );
 }
 
-function ThreadRow({ thread, onDelete, onReply, onMic, isRecordingGlobal }: any) {
+function ThreadRow({ thread, onDelete, onReply, onMic, isRecordingGlobal, stripMarkdown }: any) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isSendingLocal, setIsSendingLocal] = useState(false);
@@ -772,7 +800,7 @@ function ThreadRow({ thread, onDelete, onReply, onMic, isRecordingGlobal }: any)
            <span className={`transition-colors duration-200 truncate min-w-[120px] ${isExpanded ? 'font-bold text-[#202124]' : 'font-semibold text-[#202124]'}`}>
               {thread.subject || '(Subject Missing)'}
            </span>
-           {!isExpanded && <span className="text-[#5f6368] truncate opacity-60">- {lastMsg.content}</span>}
+           {!isExpanded && <span className="text-[#5f6368] truncate opacity-60">- {stripMarkdown(lastMsg.content)}</span>}
         </div>
         
         <div className="flex items-center gap-4">
