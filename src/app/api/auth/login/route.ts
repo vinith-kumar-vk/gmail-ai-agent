@@ -5,6 +5,7 @@ import { comparePassword, createToken } from '@/lib/auth';
 export async function POST(req: Request) {
     try {
         const { email, password } = await req.json();
+        console.log('Login attempt for:', email);
 
         if (!email || !password) {
             return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
@@ -13,6 +14,12 @@ export async function POST(req: Request) {
         const user = await prisma.user.findUnique({
             where: { email }
         });
+
+        console.log('User found:', !!user);
+        if (user) {
+            const isMatch = await comparePassword(password, user.password);
+            console.log('Password match:', isMatch);
+        }
 
         if (!user || !(await comparePassword(password, user.password))) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
