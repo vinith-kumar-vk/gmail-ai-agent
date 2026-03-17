@@ -252,7 +252,7 @@ export default function Dashboard() {
                         t.messages.some((m: any) => m.from?.toLowerCase().includes(searchQuery.toLowerCase()));
     if (!matchesSearch) return false;
     
-    if (currentView === 'inbox') return t.messages[t.messages.length - 1]?.role === 'user';
+    if (currentView === 'inbox') return t.messages.some((m: any) => m.role === 'user');
     if (currentView === 'sent') return t.messages.some((m: any) => m.role === 'ai' || m.from === 'me');
     if (currentView === 'starred') return t.messages.some((m: any) => m.sentiment === 'negative');
     return true;
