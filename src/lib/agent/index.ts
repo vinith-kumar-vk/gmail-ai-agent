@@ -173,6 +173,42 @@ export async function startAgent() {
                     }
                 }
             }
+
+            // -------------------------------------------------------------------------
+            // 🔄 MIRROR MODE: PRUNING LOGIC (Reflect Gmail Deletions)
+            // -------------------------------------------------------------------------
+            // We only prune if we successfully fetched emails
+            if (allEmails && allEmails.length > 0) {
+                const fetchedRawIds = new Set(allEmails.map(e => e.messageId));
+                
+                // Fetch all messages in DB that have a rawMessageId (synced from IMAP/SMTP)
+                const dbMessages = await prisma.message.findMany({
+                    where: { rawMessageId: { not: null } },
+                    select: { id: true, rawMessageId: true, role: true, content: true }
+                });
+
+                let pruneCount = 0;
+                for (const dbMsg of dbMessages) {
+                    if (dbMsg.rawMessageId && !fetchedRawIds.has(dbMsg.rawMessageId)) {
+                        // This message exists in our DB but was NOT found in the latest Gmail fetch
+                        // It was likely deleted in Gmail, so let's delete it from DB
+                        await prisma.message.delete({ where: { id: dbMsg.id } });
+                        pruneCount++;
+                    }
+                }
+
+                if (pruneCount > 0) {
+                    logger(`[MIRROR] Pruned ${pruneCount} messages (deleted in Gmail).`);
+                    
+                    // Cleanup empty threads
+                    const emptyThreads = await prisma.thread.findMany({
+                        where: { messages: { none: {} } }
+                    });
+                    for (const t of emptyThreads) {
+                        await prisma.thread.delete({ where: { id: t.id } });
+                    }
+                }
+            }
         } catch (pollErr: any) {
             logger(`[CRITICAL] ${pollErr.message}`);
         }
