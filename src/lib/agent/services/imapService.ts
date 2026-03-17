@@ -1,8 +1,51 @@
 import { ImapFlow } from 'imapflow';
 import { logger } from '../index';
-import { NodeHtmlMarkdown } from 'node-html-markdown';
 import * as qp from 'quoted-printable';
 import * as utf8 from 'utf8';
+
+/**
+ * Converts raw HTML email content to clean, readable plain text.
+ * Strips all HTML tags, markdown artifacts, URLs, and formatting codes.
+ * This is the PERMANENT fix to prevent code/markdown from showing in UI.
+ */
+function htmlToPlainText(html: string): string {
+  let text = html;
+
+  // Remove <style> and <script> blocks entirely
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+  // Replace block-level tags with newlines for readability
+  text = text.replace(/<\/(p|div|tr|li|h[1-6]|blockquote)>/gi, '\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<hr\s*\/?>/gi, '\n---\n');
+
+  // Strip all remaining HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+
+  // Decode common HTML entities
+  text = text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&zwnj;/gi, '')
+    .replace(/&quot;/gi, '"')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#(\d+);/gi, (_, code) => String.fromCharCode(parseInt(code, 10)));
+
+  // Remove leftover QP/encoding artifacts
+  text = text.replace(/=\r?\n/g, '');
+  text = text.replace(/3D"/g, '"');
+  text = text.replace(/\\=/g, '=');
+
+  // Collapse whitespace but preserve paragraph breaks
+  text = text.replace(/[ \t]+/g, ' ');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  text = text.trim();
+
+  return text || '(Empty content)';
+}
 
 export interface EmailMessage {
   uid: number;
@@ -179,26 +222,11 @@ export class IMAPService {
                              processed.toLowerCase().includes('<table');
 
       if (isHtml || hasHtmlMarkers) {
-        // Step 1: Professional HTML to Markdown conversion
-        processed = NodeHtmlMarkdown.translate(processed);
-        
-        // Step 2: Ultimate Cleanup Guard
-        processed = processed
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/&nbsp;/gi, ' ')
-          .replace(/&zwnj;/gi, '')
-          .replace(/&quot;/gi, '"')
-          .replace(/&amp;/gi, '&')
-          .replace(/&lt;/gi, '<')
-          .replace(/&gt;/gi, '>')
-          .replace(/&apos;/gi, "'")
-          .replace(/\\=/g, '=') // Fix some leftover escape chars
-          .replace(/3D"/g, '"'); 
+        // Use our clean HTML→PlainText converter (no markdown artifacts)
+        return htmlToPlainText(processed);
       }
 
-      // Step 3: Final structural cleanup
+      // For plain text, just clean up whitespace
       return processed.replace(/\s+/g, ' ').trim() || '(Empty content)';
     } catch (err: any) {
       await client.logout().catch(() => {});
